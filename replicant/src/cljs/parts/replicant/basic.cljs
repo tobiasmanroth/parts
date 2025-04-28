@@ -39,6 +39,15 @@
                                       (= :store/get (first x)))
                                (get (:ui/state w)
                                     (second x))))}
+
+   {:ui.action-enricher/kind :event/target.files
+    :ui.action-enricher/fn (fn [{:keys [ui.action/x] :as w}]
+                             (when (and (keyword? x)
+                                     (= x
+                                        :event/target.files))
+                               (-> (:replicant/js-event w)
+                                   .-target
+                                   .-files)))}
    ])
 
 (def dom-action-handlers
