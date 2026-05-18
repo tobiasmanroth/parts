@@ -48,6 +48,19 @@
          (find-command-def ((:system/get-register w))
                            (:ring/request-params w))))
 
+(defn replay-exception?
+  "Returns true when `e` or one of its causes represents a command replay.
+
+   Command handlers can throw an ex-info with `:command/replay? true` in the
+   ex-data to short-circuit duplicate command execution. Replays are returned as
+   successful no-op responses instead of command failures."
+  [e]
+  (loop [e e]
+    (cond
+      (nil? e) false
+      (true? (:command/replay? (ex-data e))) true
+      :else (recur (.getCause e)))))
+
 (defn add-response-params
   [w]
   (assoc w
@@ -61,12 +74,16 @@
                    (f)
                    (:command/result)))
              (catch Exception e
-               ((:log/log w
-                          identity)
-                {:log/error :command-fn-failed
-                 :command (:ring/request-params w)
-                 :exception e})
-               {:error :command-fn-failed}))
+               (if (replay-exception? e)
+                 {:success? true
+                  :command/replay? true}
+                 (do
+                   ((:log/log w
+                              identity)
+                    {:log/error :command-fn-failed
+                     :command (:ring/request-params w)
+                     :exception e})
+                   {:error :command-fn-failed}))))
            {:error :unkown-command-type
             :command (:ring/request-params w)})))
 
